@@ -1,5 +1,5 @@
 #--
-# (c) Copyright 2007-2009 Sun Microsystems, Inc.
+# (c) Copyright 2007-2008 Sun Microsystems, Inc.
 # See the file LICENSES.txt included with the distribution for
 # software license details.
 #++
@@ -51,10 +51,12 @@ module Warbler
     private
     def define_tasks
       define_main_task
+      define_aot_task
       define_clean_task
       define_public_task
       define_gems_task
       define_webxml_task
+      define_compile_task
       define_app_task
       define_jar_task
       define_exploded_task
@@ -64,6 +66,11 @@ module Warbler
     def define_main_task
       desc "Create #{@config.war_name}.war"
       task @name => ["#{@name}:app", "#{@name}:public", "#{@name}:webxml", "#{@name}:jar"]
+    end
+
+    def define_aot_task
+      desc "Create AOT #{@config.war_name}.war"
+      task "#{@name}:aot" => ["#{@name}:app", "#{@name}:public", "#{@name}:webxml", "#{@name}:compile", "#{@name}:jar"]
     end
 
     def define_clean_task
@@ -169,6 +176,23 @@ module Warbler
       end
     end
 
+    def define_compile_task
+      with_namespace_and_config do |name, config|
+        desc "Compile rails code, and patch activesupport"
+        task "compile" do
+          # replace lib/active_support/dependencies.rb with patched version
+          cp "#{File.dirname(__FILE__)}/dependencies-2.2.2.rb",
+                "#{@config.staging_dir}/WEB-INF/gems/gems/activesupport-2.2.2/lib/active_support/dependencies.rb"
+
+          # jrubyc all app file.
+          Dir["#{@config.staging_dir}/WEB-INF/app/**/*.rb"].each do |file|
+            rm file
+          end
+          sh "jrubyc app -t #{@config.staging_dir}/WEB-INF"
+        end
+      end
+    end
+
     def define_jar_task
       with_namespace_and_config do |name, config|
         desc "Run the jar command to create the .war"
@@ -227,11 +251,7 @@ module Warbler
     end
 
     def define_webinf_file_tasks
-      target_files = @config.dirs.select do |d|
-        exists = File.directory?(d)
-        warn "warning: application directory `#{d}' does not exist or is not a directory; skipping" unless exists
-        exists
-      end.map do |d|
+      target_files = @config.dirs.map do |d|
         define_file_task(d, "#{@config.staging_dir}/#{apply_pathmaps(d, :application)}")
       end
       files = FileList[*(@config.dirs.map{|d| "#{d}/**/*"})]
@@ -322,7 +342,7 @@ module Warbler
 
       task gem_unpack_task_name => [dest.pathmap("%d")] do |t|
         require 'rubygems/installer'
-        Gem::Installer.new(src, :unpack => true).unpack(dest)
+        Gem::Installer.new(src).unpack(dest)
       end
 
       if @config.gem_dependencies
