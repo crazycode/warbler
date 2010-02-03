@@ -181,8 +181,8 @@ module Warbler
         desc "Compile rails code, and patch activesupport"
         task "compile" do
           # replace lib/active_support/dependencies.rb with patched version
-          cp "#{File.dirname(__FILE__)}/dependencies-2.2.2.rb",
-                "#{@config.staging_dir}/WEB-INF/gems/gems/activesupport-2.2.2/lib/active_support/dependencies.rb"
+          cp "#{File.dirname(__FILE__)}/dependencies-2.3.2.rb",
+                "#{@config.staging_dir}/WEB-INF/gems/gems/activesupport-2.3.2/lib/active_support/dependencies.rb"
 
           # jrubyc all app file.
           Dir["#{@config.staging_dir}/WEB-INF/app/**/*.rb"].each do |file|
